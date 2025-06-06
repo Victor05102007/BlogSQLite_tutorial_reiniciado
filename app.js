@@ -23,7 +23,7 @@ const db = new sqlite3.Database("user.db"); // Instância para uso do Sqlite3, e
 db.serialize(() => {
   // Este método permite enviar comandos SQL em modo 'sequencial'
   db.run(
-    `CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+    `CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT, password TEXT, email TEXT, celular TEXT, cpf TEXT, rg TEXT)`
   );
 });
@@ -45,6 +45,7 @@ app.use(
 // Middleware para isto, que neste caso é o express.static, que gerencia rotas estáticas
 app.use("/static", express.static(__dirname + "/static"));
 
+app.use(express.json());
 // Middleware para processar as requisições do Body Parameters do cliente
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -59,7 +60,7 @@ const login = 'Vc está na página "Login"<br><a href="/">Voltar</a>';
 const cadastro = 'Vc está na página "Cadastro"<br><a href="/">Voltar</a>';
 
 
-/* Método express.get necessita de dois parâmetros 
+/* Método express.get necessita de dois parâmetros
  Na ARROW FUNCTION, o primeiro são os dados do servidor (REQUISITION - 'req')
  o segundo, são os dados que serão enviados ao cliente (RESULT - 'res') */
 
@@ -102,19 +103,34 @@ app.get("/cadastro", (req, res) => {
 
 // POST do cadastro
 app.post("/cadastro", (req, res) => {
-  console.log("POST /cadastro");
+  console.log("POST /cadastro - recebid");
   // Linha para depurar se esta vindo dados no req.body
-  !req.body
-    ? console.log(`Body vazio: ${req.body}`)
-    : console.log(JSON.stringify(req.body));
+  if (!req.body || Object.keys(req.body).length === 0) {
+    console.log("corpo da requisição vazio");
+
+    return res.status(400).json({ success: false, message: "Nenhuma dado recebido." });
+  }
+
+  console.log("corpo da requisição:", JSON.stringify(req.body, null, 2));
 
   const { username, password, email, celular, cpf, rg } = req.body;
   // Colocar aqui as validações e inclusão no banco de dados do cadastro do usuário
   // 1. Validar dados do usuário
   // 2. saber se ele já existe no banco
-  const query =
-    // "SELECT * FROM users WHERE email=? OR cpf=? OR rg=? OR username=?";
-    "SELECT * FROM users WHERE username=?";
+  if (!username || !password || !email) {
+    return res.status(400).json({
+      success: false,
+      message: "Nome de usuário, senha e email são obrigatórios.",
+    });
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({
+      success: false,
+      message: "Formato de email inválido.",
+    });
+  }
 
   // db.get(query, [email, cpf, rg, username], (err, row) => {
   db.get(query, [username], (err, row) => {
